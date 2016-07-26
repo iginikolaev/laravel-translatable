@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Database\Eloquent\Model;
-
+use Illuminate\Database\Eloquent\Relations\Relation;
 trait Translatable
 {
     /**
@@ -54,26 +54,27 @@ trait Translatable
      */
     public function getTranslation($locale = null, $withFallback = null)
     {
+        $configFallbackLocale = $this->getFallbackLocale($locale);
         $locale = $locale ?: $this->locale();
         $withFallback = $withFallback === null ? $this->useFallback() : $withFallback;
         $fallbackLocale = $this->getFallbackLocale($locale);
-
+        
         if ($this->isJoinTranslated()) {
             return null;
         }
-
-        if ($this->getTranslationByLocaleKey($locale)) {
-            $translation = $this->getTranslationByLocaleKey($locale);
-        } elseif ($withFallback
-            && $fallbackLocale
-            && $this->getTranslationByLocaleKey($fallbackLocale)
-        ) {
-            $translation = $this->getTranslationByLocaleKey($fallbackLocale);
-        } else {
-            $translation = null;
+        
+        if ($translation = $this->getTranslationByLocaleKey($locale)) {
+            return $translation;
         }
-
-        return $translation;
+        if ($withFallback && $fallbackLocale) {
+            if ($translation = $this->getTranslationByLocaleKey($fallbackLocale)) {
+                return $translation;
+            }
+            if ($translation = $this->getTranslationByLocaleKey($configFallbackLocale)) {
+                return $translation;
+            }
+        }
+        return null;
     }
 
     /**
@@ -462,6 +463,21 @@ trait Translatable
 
     /**
      * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $locale
+     *
+     * @return \Illuminate\Database\Eloquent\Builder|static
+     */
+    public function scopeNotTranslatedIn(Builder $query, $locale = null)
+    {
+        $locale = $locale ?: $this->locale();
+
+        return $query->whereDoesntHave('translations', function (Builder $q) use ($locale) {
+            $q->where($this->getLocaleKey(), '=', $locale);
+        });
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder $query
      *
      * @return \Illuminate\Database\Eloquent\Builder|static
      */
@@ -533,9 +549,9 @@ trait Translatable
      *
      * @return \Illuminate\Database\Eloquent\Builder|static
      */
-    public function scopeWhereTranslation($query, $key, $value, $locale = null)
+    public function scopeWhereTranslation(Builder $query, $key, $value, $locale = null)
     {
-        return $query->whereHas('translations', function ($query) use ($key, $value, $locale) {
+        return $query->whereHas('translations', function (Builder $query) use ($key, $value, $locale) {
             $query->where($this->getTranslationsTable() . '.' . $key, $value);
             if ($locale) {
                 $query->where($this->getTranslationsTable() . '.' . $this->getLocaleKey(), $locale);
@@ -554,10 +570,11 @@ trait Translatable
      *
      * @return \Illuminate\Database\Eloquent\Builder|static
      */
-    public function scopeWhereTranslationLike($query, $key, $value, $locale = null)
+    public function scopeWhereTranslationLike(Builder $query, $key, $value, $locale = null)
     {
-        return $query->whereHas('translations', function ($query) use ($key, $value, $locale) {
+        return $query->whereHas('translations', function (Builder $query) use ($key, $value, $locale) {
             $query->where($this->getTranslationsTable() . '.' . $key, 'LIKE', $value);
+
             if ($locale) {
                 $query->where($this->getTranslationsTable() . '.' . $this->getLocaleKey(), 'LIKE', $locale);
             }
