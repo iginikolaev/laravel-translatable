@@ -12,7 +12,7 @@ trait Translatable
 {
     public static function bootTranslatable()
     {
-        static::addGlobalScope('joinTranslation', function(Builder $builder){
+        static::addGlobalScope('joinTranslation', function (Builder $builder) {
             return static::scopeJoinTranslation($builder, null);
         });
     }
@@ -646,61 +646,136 @@ trait Translatable
             ? : App::make('translator')->getLocale();
     }
 
+    protected function _addTranslationColumns(Builder $builder, $localeTable, $fallbackTable)
+    {
+        $columns = [];
+        $originalColumns = $builder->getQuery()->columns;
+        if ($originalColumns === null) {
+            $columns[] = $this->getTable() . '.*';
+            foreach ($this->translatedAttributes as $_name) {
+                $columns[] = $this->_getTranslationColumn($localeTable, $fallbackTable, $_name);
+            }
+        } else {
+            foreach ($originalColumns as $_name) {
+                $columns[] = $this->isTranslationAttribute($_name) ?
+                    $this->_getTranslationColumn($localeTable, $fallbackTable, $_name) :
+                    $_name;
+            }
+        }
+
+        $builder->getQuery()->select($columns);
+    }
+
+    /**
+     * @param Builder $builder
+     * @param string $locale
+     *
+     * @return string
+     */
+    protected function _addTranslationJoin(Builder $builder, $locale)
+    {
+        $translationModelName = $this->getTranslationModelName();
+        $translationModel = new $translationModelName();
+
+        $tableAbbr = '_t' . $locale;
+
+        $builder->leftJoin(
+            $translationModel->getTable() . ' as ' . $tableAbbr,
+            function ($join) use ($tableAbbr, $locale) {
+                $join->on(
+                    $tableAbbr . '.' . $this->getRelationKey()
+                    , '='
+                    , $this->getTable() . '.' . $this->getKeyName()
+                )->where(
+                    $tableAbbr . '.' . $this->getLocaleKey()
+                    , '='
+                    , $locale
+                );
+            }
+        );
+
+        return $tableAbbr;
+    }
+
+    /**
+     * @param string $localeTable
+     * @param string $fallbackTable
+     * @param string $name
+     *
+     * @return \Illuminate\Database\Query\Expression
+     */
+    protected function _getTranslationColumn($localeTable, $fallbackTable, $name)
+    {
+        return \DB::raw('IFNULL(' . $localeTable . '.' . $name . ', ' . $fallbackTable . '.' . $name . ') as ' . $name);
+    }
+
+    protected function _addTranslationWhere(Builder $builder, $localeTable, $fallbackTable)
+    {
+        $query = $builder->getQuery();
+        if (!$query->wheres) {
+            return;
+        }
+
+        $bindings = $query->getRawBindings()['where'];
+
+        $columns = [];
+
+        foreach ($query->wheres as $k => $_where) {
+            if (!empty($_where['column'])
+                && $this->isTranslationAttribute($_where['column'])
+            ) {
+                $columns[] = $_where;
+
+                $bindingKey = array_keys($bindings, $_where['value'])[0];
+                unset($bindings[$bindingKey], $query->wheres[$k]);
+            }
+        }
+
+        if ($columns) {
+            $query->setBindings(array_values($bindings), 'where');
+            $query->wheres = array_values($query->wheres);
+
+            foreach ($columns as $column) {
+                $builder->where(function ($query) use ($column, $localeTable, $fallbackTable) {
+                    $query->where(
+                        $localeTable . '.' . $column['column']
+                        , $column['operator']
+                        , $column['value']
+                        , $column['boolean']
+                    );
+                    $query->where(
+                        $fallbackTable . '.' . $column['column']
+                        , $column['operator']
+                        , $column['value']
+                        , 'or'
+                    );
+                });
+            }
+        }
+    }
+
     /**
      * Inner join with the translation table
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param \Illuminate\Database\Eloquent\Builder $builder
      * @param null $locale
      *
      * @return $this
      */
-    public static function scopeJoinTranslation(Builder $query, $locale = null)
+    public static function scopeJoinTranslation(Builder $builder, $locale = null)
     {
         $instance = new static;
 
-        $translationModelName = $instance->getTranslationModelName();
-        $translationModel = new $translationModelName();
+        $locale = is_null($locale) ? $instance->locale() : $locale;
+        $fallbackLocale = $instance->getFallbackLocale();
 
-        if (is_null($locale)) {
-            $locale = $instance->locale();
-        }
+        $localeTable = $instance->_addTranslationJoin($builder, $locale);
+        $fallbackTable = $instance->_addTranslationJoin($builder, $fallbackLocale);
 
-        $query
-            ->leftJoin(
-                $translationModel->getTable() . ' as tf'
-                , function ($join) use ($instance) {
-                $join
-                    ->on(
-                        'tf.' . $instance->getRelationKey()
-                        , '='
-                        , $instance->getTable() . '.' . $instance->getKeyName()
-                    )
-                    ->where(
-                        'tf.' . $instance->getLocaleKey()
-                        , '='
-                        , $instance->getFallbackLocale()
-                    );
-            });
+        $instance->_addTranslationColumns($builder, $localeTable, $fallbackTable);
+        $instance->_addTranslationWhere($builder, $localeTable, $fallbackTable);
 
-        $query->leftJoin(
-                $translationModel->getTable() . ' as t'
-                , function ($join) use ($instance, $locale) {
-                $join->on(
-                    't.' . $instance->getRelationKey()
-                    , '='
-                    , $instance->getTable() . '.' . $instance->getKeyName()
-                )->where('t.' . $instance->getLocaleKey(), '=', $locale);
-            });
-
-        if ($query->getQuery()->columns === null) {
-            $query->addSelect($instance->getTable().'.*');
-        }
-
-        foreach($instance->translatedAttributes as $attr) {
-            $query->addSelect(\DB::raw('IFNULL(t.'.$attr.', tf.'.$attr.') as '.$attr));
-        }
-
-        return $query;
+        return $builder;
     }
 
     /**
