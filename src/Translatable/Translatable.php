@@ -236,20 +236,6 @@ trait Translatable
     }
 
     /**
-     * @param string $locale
-     *
-     * @return \Illuminate\Database\Eloquent\Model|null
-     */
-    protected function getTranslationOrNew($locale)
-    {
-        if (($translation = $this->getTranslation($locale, false)) === null) {
-            $translation = $this->getNewTranslation($locale);
-        }
-
-        return $translation;
-    }
-
-    /**
      * @param array $attributes
      *
      * @return $this
@@ -261,10 +247,21 @@ trait Translatable
         $totallyGuarded = $this->totallyGuarded();
 
         foreach ($attributes as $key => $values) {
-            if ($this->isKeyALocale($key)) {
+            if ($this->isTranslationAttribute($key)) {
+                foreach($values as $locale => $translationValue) {
+                    $translationModel = $this->getTranslationOrNew($locale);
+                    if ($this->alwaysFillable() || $translationModel->isFillable($key)) {
+                        $translationModel->$key = $translationValue;
+                    } else {
+                        throw new MassAssignmentException($key);
+                    }
+                }
+                unset($attributes[$key]);
+            } elseif ($this->isKeyALocale($key)) {
+                $translationModel = $this->getTranslationOrNew($key);
                 foreach ($values as $translationAttribute => $translationValue) {
-                    if ($this->alwaysFillable() || $this->isFillable($translationAttribute)) {
-                        $this->getTranslationOrNew($key)->$translationAttribute = $translationValue;
+                    if ($this->alwaysFillable() || $translationModel->isFillable($translationAttribute)) {
+                        $translationModel->$translationAttribute = $translationValue;
                     } elseif ($totallyGuarded) {
                         throw new MassAssignmentException($key);
                     }
@@ -274,6 +271,20 @@ trait Translatable
         }
 
         return parent::fill($attributes);
+    }
+
+    /**
+     * @param string $locale
+     *
+     * @return \Illuminate\Database\Eloquent\Model|null
+     */
+    protected function getTranslationOrNew($locale)
+    {
+        if (($translation = $this->getTranslation($locale, false)) === null) {
+            $translation = $this->getNewTranslation($locale);
+        }
+
+        return $translation;
     }
 
     /**
@@ -369,7 +380,7 @@ trait Translatable
      *
      * @throws \Dimsav\Translatable\Exception\LocalesNotDefinedException
      */
-    protected function getLocales()
+    public function getLocales()
     {
         $localesConfig = (array)App::make('config')->get('translatable.locales');
 
@@ -416,6 +427,8 @@ trait Translatable
 
         return $saved;
     }
+
+    
 
     /**
      * @param \Illuminate\Database\Eloquent\Model $translation
@@ -709,7 +722,7 @@ trait Translatable
         return \DB::raw('IFNULL(' . $localeTable . '.' . $name . ', ' . $fallbackTable . '.' . $name . ') as ' . $name);
     }
 
-    protected function _addTranslationWhere(Builder $builder, $localeTable, $fallbackTable)
+    protected function _addTranslationWheres(Builder $builder, $localeTable, $fallbackTable)
     {
         $query = $builder->getQuery();
         if (!$query->wheres) {
@@ -718,35 +731,29 @@ trait Translatable
 
         $bindings = $query->getRawBindings()['where'];
 
-        $columns = [];
-
         foreach ($query->wheres as $k => $_where) {
             if (!empty($_where['column'])
                 && $this->isTranslationAttribute($_where['column'])
             ) {
-                $columns[] = $_where;
-
                 $bindingKey = array_keys($bindings, $_where['value'])[0];
                 unset($bindings[$bindingKey], $query->wheres[$k]);
-            }
-        }
+                $query->setBindings(array_values($bindings), 'where');
 
-        if ($columns) {
-            $query->setBindings(array_values($bindings), 'where');
-            $query->wheres = array_values($query->wheres);
-
-            foreach ($columns as $column) {
-                $builder->where(function ($query) use ($column, $localeTable, $fallbackTable) {
+                $query->whereNested(function (QueryBuilder $query) use (
+                    $_where,
+                    $localeTable,
+                    $fallbackTable
+                ) {
                     $query->where(
-                        $localeTable . '.' . $column['column']
-                        , $column['operator']
-                        , $column['value']
-                        , $column['boolean']
+                        $localeTable . '.' . $_where['column']
+                        , $_where['operator']
+                        , $_where['value']
+                        , $_where['boolean']
                     );
                     $query->where(
-                        $fallbackTable . '.' . $column['column']
-                        , $column['operator']
-                        , $column['value']
+                        $fallbackTable . '.' . $_where['column']
+                        , $_where['operator']
+                        , $_where['value']
                         , 'or'
                     );
                 });
@@ -773,7 +780,7 @@ trait Translatable
         $fallbackTable = $instance->_addTranslationJoin($builder, $fallbackLocale);
 
         $instance->_addTranslationColumns($builder, $localeTable, $fallbackTable);
-        $instance->_addTranslationWhere($builder, $localeTable, $fallbackTable);
+        $instance->_addTranslationWheres($builder, $localeTable, $fallbackTable);
 
         return $builder;
     }
