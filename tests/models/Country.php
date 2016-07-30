@@ -1,6 +1,6 @@
-<?php namespace Dimsav\Translatable\Test\Model;
+<?php namespace Iginikolaev\Translatable\Test\Model;
 
-use Dimsav\Translatable\Translatable;
+use Iginikolaev\Translatable\Translatable;
 use Illuminate\Database\Eloquent\Model as Eloquent;
 
 class Country extends Eloquent

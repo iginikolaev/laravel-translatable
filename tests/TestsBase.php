@@ -1,7 +1,7 @@
 <?php
 
 use Orchestra\Testbench\TestCase;
-use Dimsav\Translatable\Test\Model\Country;
+use Iginikolaev\Translatable\Test\Model\Country;
 
 class TestsBase extends TestCase
 {
@@ -62,7 +62,7 @@ class TestsBase extends TestCase
 
     protected function getPackageProviders($app)
     {
-        return ['Dimsav\Translatable\TranslatableServiceProvider'];
+        return ['Iginikolaev\Translatable\TranslatableServiceProvider'];
     }
 
     protected function getEnvironmentSetUp($app)

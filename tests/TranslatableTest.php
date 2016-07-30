@@ -1,9 +1,9 @@
 <?php
 
-use Dimsav\Translatable\Test\Model\Country;
-use Dimsav\Translatable\Test\Model\CountryStrict;
-use Dimsav\Translatable\Test\Model\CountryWithCustomLocaleKey;
-use Dimsav\Translatable\Test\Model\Food;
+use Iginikolaev\Translatable\Test\Model\Country;
+use Iginikolaev\Translatable\Test\Model\CountryStrict;
+use Iginikolaev\Translatable\Test\Model\CountryWithCustomLocaleKey;
+use Iginikolaev\Translatable\Test\Model\Food;
 
 class TranslatableTest extends TestsBase
 {
@@ -11,7 +11,7 @@ class TranslatableTest extends TestsBase
     {
         $country = new Country();
         $this->assertEquals(
-            'Dimsav\Translatable\Test\Model\CountryTranslation',
+            'Iginikolaev\Translatable\Test\Model\CountryTranslation',
             $country->getTranslationModelNameDefault());
     }
 
@@ -20,7 +20,7 @@ class TranslatableTest extends TestsBase
         App::make('config')->set('translatable.translation_suffix', 'Trans');
         $country = new Country();
         $this->assertEquals(
-            'Dimsav\Translatable\Test\Model\CountryTrans',
+            'Iginikolaev\Translatable\Test\Model\CountryTrans',
             $country->getTranslationModelName());
     }
 
@@ -325,7 +325,7 @@ class TranslatableTest extends TestsBase
     }
 
     /**
-     * @expectedException Dimsav\Translatable\Exception\LocalesNotDefinedException
+     * @expectedException Iginikolaev\Translatable\Exception\LocalesNotDefinedException
      */
     public function test_if_locales_are_not_defined_throw_exception()
     {

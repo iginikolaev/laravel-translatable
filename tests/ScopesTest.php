@@ -1,6 +1,6 @@
 <?php
 
-use Dimsav\Translatable\Test\Model\Country;
+use Iginikolaev\Translatable\Test\Model\Country;
 
 class ScopesTest extends TestsBase
 {

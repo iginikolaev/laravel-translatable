@@ -1,4 +1,4 @@
-<?php namespace Dimsav\Translatable\Test\Model;
+<?php namespace Iginikolaev\Translatable\Test\Model;
 
 use Illuminate\Database\Eloquent\Model as Eloquent;
 

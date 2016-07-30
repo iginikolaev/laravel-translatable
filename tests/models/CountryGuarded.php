@@ -1,6 +1,6 @@
-<?php namespace Dimsav\Translatable\Test\Model;
+<?php namespace Iginikolaev\Translatable\Test\Model;
 
-use Dimsav\Translatable\Translatable;
+use Iginikolaev\Translatable\Translatable;
 use Illuminate\Database\Eloquent\Model as Eloquent;
 
 class CountryGuarded extends Eloquent
@@ -13,6 +13,6 @@ class CountryGuarded extends Eloquent
 
     public $translatedAttributes = ['name'];
 
-    public $translationModel = 'Dimsav\Translatable\Test\Model\CountryTranslation';
+    public $translationModel = 'Iginikolaev\Translatable\Test\Model\CountryTranslation';
     public $translationForeignKey = 'country_id';
 }

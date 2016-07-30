@@ -1,7 +1,7 @@
-<?php namespace Dimsav\Translatable;
+<?php namespace Iginikolaev\Translatable;
 
 use App;
-use Dimsav\Translatable\Exception\LocalesNotDefinedException;
+use Iginikolaev\Translatable\Exception\LocalesNotDefinedException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\MassAssignmentException;
@@ -366,7 +366,7 @@ trait Translatable
      *
      * @return bool
      *
-     * @throws \Dimsav\Translatable\Exception\LocalesNotDefinedException
+     * @throws \Iginikolaev\Translatable\Exception\LocalesNotDefinedException
      */
     protected function isKeyALocale($key)
     {
@@ -378,7 +378,7 @@ trait Translatable
     /**
      * @return array
      *
-     * @throws \Dimsav\Translatable\Exception\LocalesNotDefinedException
+     * @throws \Iginikolaev\Translatable\Exception\LocalesNotDefinedException
      */
     public function getLocales()
     {
